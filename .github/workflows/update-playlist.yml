@@ -1,0 +1,32 @@
+name: Build combined IPTV playlist
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Build and validate playlist
+        run: python build_playlist.py
+      - name: Commit updated playlist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add all.m3u
+          if git diff --staged --quiet; then
+            echo "unchanged"
+            exit 0
+          fi
+          git commit -m "Update combined IPTV playlist"
+          git push
