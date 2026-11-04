@@ -1,22 +1,40 @@
-# SMOLNP — основные
-https://smolnp.github.io/IPTVru//IPTVru.m3u
-https://smolnp.github.io/IPTVru//IPTVstable.m3u8
-https://smolnp.github.io/IPTVru//IPTVmir.m3u8
+
+# ==========================================
+# SMOLNP — ОСНОВНЫЕ РОССИЙСКИЕ ПЛЕЙЛИСТЫ
+# ==========================================
+
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVru.m3u
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVstable.m3u8
+
+# SMOLNP — МИРОВОЙ
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVmir.m3u8
 
 # SMOLNP — 18+
-https://smolnp.github.io/IPTVru//IPTVxxx.m3u
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTV%D1%85%D1%85%D1%85.m3u
 
-# FREE-TV
+# ==========================================
+# FREE-TV — РОССИЙСКИЕ КАНАЛЫ
+# ==========================================
+
 https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
 
+# ==========================================
 # IPTVRU
+# ==========================================
+
 https://raw.githubusercontent.com/iptvru/iptv/master/ru(ver48.0).m3u
 
-# IPTV-ORG
+# ==========================================
+# IPTV-ORG — РУССКИЙ ЯЗЫК И РОССИЯ
+# ==========================================
+
 https://iptv-org.github.io/iptv/languages/rus.m3u
 https://iptv-org.github.io/iptv/countries/ru.m3u
 
-# IPTV-ORG — тематические
+# ==========================================
+# IPTV-ORG — ТЕМАТИЧЕСКИЕ КАТЕГОРИИ
+# ==========================================
+
 https://iptv-org.github.io/iptv/categories/movies.m3u
 https://iptv-org.github.io/iptv/categories/animation.m3u
 https://iptv-org.github.io/iptv/categories/news.m3u
