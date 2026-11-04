@@ -1,12 +1,18 @@
 
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """Сборка all.m3u из sources.txt с сохранением настроек воспроизведения."""
 
 import os
 import re
 import sys
 import time
+import json
+import base64
 import urllib.request
+import urllib.error
+import urllib.parse
 
 SOURCES_FILE = "sources.txt"
 OUTPUT_FILE = "all.m3u"
@@ -32,55 +38,152 @@ GROUP_RULES = [
     ("Детские", r"kids|child|cartoon|animation|мульт|детск"),
     ("Религия", r"relig|христиан|правосл|ислам"),
     ("Региональные", r"local|region|местн|област|регион"),
-    ("Кино и сериалы", r"movie|film|cinema|кино|фильм|сериал|series|comed|комед|драм|drama|thriller|horror|триллер|ужас|боевик|мелодрам"),
-    ("Познавательные", r"document|educat|science|познават|образоват|наук|хобби|lifestyle|outdoor|travel|cooking|nature|culture|культур|histor|истори|weather|auto|авто"),
-    ("Федеральные", r"general|entertainment|развлек|общественн|эфир|public|federal|федеральн|interactive"),
+    (
+        "Кино и сериалы",
+        r"movie|film|cinema|кино|фильм|сериал|series|comed|комед|драм|"
+        r"drama|thriller|horror|триллер|ужас|боевик|мелодрам"
+    ),
+    (
+        "Познавательные",
+        r"document|educat|science|познават|образоват|наук|хобби|"
+        r"lifestyle|outdoor|travel|cooking|nature|culture|культур|"
+        r"histor|истори|weather|auto|авто"
+    ),
+    (
+        "Федеральные",
+        r"general|entertainment|развлек|общественн|эфир|public|"
+        r"federal|федеральн|interactive"
+    ),
 ]
 
 GROUP_ORDER = [
-    "Федеральные", "Новости", "Кино и сериалы", "Спорт",
-    "Музыка", "Детские", "Познавательные",
-    "Региональные", "Религия", "18+", "Разное"
+    "Федеральные",
+    "Новости",
+    "Кино и сериалы",
+    "Спорт",
+    "Музыка",
+    "Детские",
+    "Познавательные",
+    "Региональные",
+    "Религия",
+    "18+",
+    "Разное"
 ]
 
 NAME_DROP = re.compile(
-    r"teleshop|телемагазин|shopping|\bqvc\b|\bhsn\b", re.I
+    r"teleshop|телемагазин|shopping|\bqvc\b|\bhsn\b",
+    re.I
 )
 
 GROUP_RE = re.compile(r'group-title="([^"]*)"', re.I)
 
-# Признаки русскоязычного канала.
-RU_ID = re.compile(r'tvg-id="[^"]*\.ru(@[^"]*)?"', re.I)
-RU_COUNTRY = re.compile(
-    r'tvg-country="(?:RU|RUS|RUSSIA|РОССИЯ)"', re.I
-)
-RU_GROUP = re.compile(
-    r'group-title="(?:Russia|Russian|Русские|Россия|Русский)"', re.I
-)
-RU_LANGUAGE = re.compile(
-    r'tvg-language="[^"]*(?:Russian|Русский|русский|rus)[^"]*"', re.I
-)
+
+def request_text(url):
+    """Загружает текст по URL."""
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "*/*"
+        }
+    )
+
+    with urllib.request.urlopen(req, timeout=45) as response:
+        data = response.read()
+
+    return data.decode("utf-8-sig", errors="replace")
 
 
 def fetch(url, retries=3):
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": USER_AGENT}
-    )
+    """Загрузка обычного источника и резервная загрузка SMOLNP."""
+
+    last_error = None
 
     for attempt in range(1, retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=40) as response:
-                data = response.read()
-                return data.decode("utf-8-sig", errors="replace")
+            return request_text(url)
 
         except Exception as exc:
-            if attempt == retries:
-                print(f"ОШИБКА загрузки: {exc}")
-                return None
+            last_error = exc
 
-            time.sleep(2 * attempt)
+            if isinstance(exc, urllib.error.HTTPError):
+                if exc.code == 404:
+                    break
 
+            if attempt < retries:
+                time.sleep(2 * attempt)
+
+    # Специальная резервная загрузка плейлистов SMOLNP.
+    if "raw.githubusercontent.com/smolnp/IPTVru/" in url:
+        print("Пробую резервную загрузку SMOLNP через GitHub API...")
+
+        filename = urllib.parse.unquote(
+            urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]
+        )
+
+        encoded_filename = urllib.parse.quote(filename, safe="")
+
+        api_url = (
+            "https://api.github.com/repos/smolnp/IPTVru/contents/"
+            + encoded_filename
+            + "?ref=gh-pages"
+        )
+
+        try:
+            req = urllib.request.Request(
+                api_url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28"
+                }
+            )
+
+            with urllib.request.urlopen(req, timeout=45) as response:
+                payload = json.loads(
+                    response.read().decode("utf-8")
+                )
+
+            if payload.get("encoding") == "base64":
+                content = base64.b64decode(
+                    payload["content"]
+                )
+
+                print("SMOLNP успешно загружен через GitHub API.")
+                return content.decode(
+                    "utf-8-sig",
+                    errors="replace"
+                )
+
+            if payload.get("download_url"):
+                text = request_text(payload["download_url"])
+                print("SMOLNP загружен по резервной ссылке.")
+                return text
+
+            raise ValueError(
+                "GitHub API не вернул содержимое файла"
+            )
+
+        except Exception as exc:
+            last_error = exc
+            print(f"GitHub API: {exc}")
+
+        # Дополнительная попытка через GitHub Pages.
+        page_urls = [
+            "https://smolnp.github.io/IPTVru//" + encoded_filename,
+            "https://smolnp.github.io/IPTVru/" + encoded_filename
+        ]
+
+        for page_url in page_urls:
+            try:
+                text = request_text(page_url)
+                print("SMOLNP загружен через GitHub Pages.")
+                return text
+
+            except Exception as exc:
+                last_error = exc
+
+    print(f"ОШИБКА загрузки: {last_error}")
     return None
 
 
@@ -108,18 +211,6 @@ def parse(text):
                 yield meta, line
 
             meta = []
-
-
-def is_russian(meta):
-    """Проверяет язык, страну и другие признаки канала."""
-    joined = "\n".join(meta)
-
-    return bool(
-        RU_ID.search(joined)
-        or RU_COUNTRY.search(joined)
-        or RU_GROUP.search(joined)
-        or RU_LANGUAGE.search(joined)
-    )
 
 
 def split_extinf(line):
@@ -225,10 +316,6 @@ def main():
                 filtered += 1
                 continue
 
-            if ru_only and not is_russian(meta):
-                filtered += 1
-                continue
-
             result = regroup(meta)
 
             if result is None:
@@ -237,8 +324,7 @@ def main():
 
             lines, group, old = result
 
-            # Не теряем варианты одного потока с разными
-            # настройками User-Agent, Referer и KODIPROP.
+            # Сохраняем варианты с разными настройками плеера.
             directives = tuple(
                 line for line in lines[1:]
                 if line.upper().startswith((
