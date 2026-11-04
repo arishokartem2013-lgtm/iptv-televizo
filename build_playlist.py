@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Сборка all.m3u из sources.txt с сохранением настроек воспроизведения."""
+"""Сборка all.m3u из sources.txt с резервной загрузкой SMOLNP."""
 
 import os
 import re
@@ -80,6 +80,7 @@ GROUP_RE = re.compile(r'group-title="([^"]*)"', re.I)
 
 def request_text(url):
     """Загружает текст по URL."""
+
     req = urllib.request.Request(
         url,
         headers={
@@ -88,14 +89,121 @@ def request_text(url):
         }
     )
 
-    with urllib.request.urlopen(req, timeout=45) as response:
+    with urllib.request.urlopen(req, timeout=60) as response:
         data = response.read()
 
     return data.decode("utf-8-sig", errors="replace")
 
 
+def valid_playlist(text):
+    """Проверяет, что сервер вернул настоящий M3U."""
+
+    return (
+        text
+        and "#EXTINF" in text
+        and ("#EXTM3U" in text or "#PLAYLIST" in text)
+    )
+
+
+def fetch_smolnp(url):
+    """Загрузка SMOLNP через несколько независимых серверов."""
+
+    path = urllib.parse.urlsplit(url).path
+    filename = urllib.parse.unquote(path.rsplit("/", 1)[-1])
+    encoded = urllib.parse.quote(filename, safe="")
+
+    print(f"SMOLNP: файл {filename}")
+    print("Проверяю резервные серверы...")
+
+    mirrors = [
+        (
+            "jsDelivr",
+            f"https://cdn.jsdelivr.net/gh/smolnp/IPTVru@gh-pages/{encoded}"
+        ),
+        (
+            "Raw Githack",
+            f"https://raw.githack.com/smolnp/IPTVru/gh-pages/{encoded}"
+        ),
+        (
+            "GitHub Pages",
+            f"https://smolnp.github.io/IPTVru//{encoded}"
+        ),
+        (
+            "GitHub Pages 2",
+            f"https://smolnp.github.io/IPTVru/{encoded}"
+        ),
+        (
+            "GitHub Raw",
+            f"https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/{encoded}"
+        )
+    ]
+
+    for name, mirror_url in mirrors:
+        try:
+            print(f"Пробую {name}...")
+
+            text = request_text(mirror_url)
+
+            if valid_playlist(text):
+                print(f"SMOLNP УСПЕШНО ЗАГРУЖЕН: {name}")
+                return text
+
+            print(f"{name}: получен не M3U файл")
+
+        except Exception as exc:
+            print(f"{name}: {exc}")
+
+    # Последняя попытка через GitHub API.
+    print("Пробую GitHub API...")
+
+    api_url = (
+        "https://api.github.com/repos/smolnp/IPTVru/contents/"
+        + encoded
+        + "?ref=gh-pages"
+    )
+
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"
+            }
+        )
+
+        with urllib.request.urlopen(req, timeout=60) as response:
+            payload = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        if payload.get("encoding") == "base64":
+            content = base64.b64decode(payload["content"])
+            text = content.decode("utf-8-sig", errors="replace")
+
+            if valid_playlist(text):
+                print("SMOLNP УСПЕШНО ЗАГРУЖЕН: GitHub API")
+                return text
+
+        if payload.get("download_url"):
+            text = request_text(payload["download_url"])
+
+            if valid_playlist(text):
+                print("SMOLNP УСПЕШНО ЗАГРУЖЕН: download_url")
+                return text
+
+    except Exception as exc:
+        print(f"GitHub API: {exc}")
+
+    print("Все способы загрузки SMOLNP исчерпаны.")
+    return None
+
+
 def fetch(url, retries=3):
-    """Загрузка обычного источника и резервная загрузка SMOLNP."""
+    """Загрузка обычного источника и SMOLNP."""
+
+    if "smolnp/IPTVru/" in url:
+        return fetch_smolnp(url)
 
     last_error = None
 
@@ -105,90 +213,18 @@ def fetch(url, retries=3):
 
         except Exception as exc:
             last_error = exc
-
-            if isinstance(exc, urllib.error.HTTPError):
-                if exc.code == 404:
-                    break
+            print(f"Попытка {attempt}/{retries}: {exc}")
 
             if attempt < retries:
                 time.sleep(2 * attempt)
-
-    # Специальная резервная загрузка плейлистов SMOLNP.
-    if "raw.githubusercontent.com/smolnp/IPTVru/" in url:
-        print("Пробую резервную загрузку SMOLNP через GitHub API...")
-
-        filename = urllib.parse.unquote(
-            urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]
-        )
-
-        encoded_filename = urllib.parse.quote(filename, safe="")
-
-        api_url = (
-            "https://api.github.com/repos/smolnp/IPTVru/contents/"
-            + encoded_filename
-            + "?ref=gh-pages"
-        )
-
-        try:
-            req = urllib.request.Request(
-                api_url,
-                headers={
-                    "User-Agent": USER_AGENT,
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28"
-                }
-            )
-
-            with urllib.request.urlopen(req, timeout=45) as response:
-                payload = json.loads(
-                    response.read().decode("utf-8")
-                )
-
-            if payload.get("encoding") == "base64":
-                content = base64.b64decode(
-                    payload["content"]
-                )
-
-                print("SMOLNP успешно загружен через GitHub API.")
-                return content.decode(
-                    "utf-8-sig",
-                    errors="replace"
-                )
-
-            if payload.get("download_url"):
-                text = request_text(payload["download_url"])
-                print("SMOLNP загружен по резервной ссылке.")
-                return text
-
-            raise ValueError(
-                "GitHub API не вернул содержимое файла"
-            )
-
-        except Exception as exc:
-            last_error = exc
-            print(f"GitHub API: {exc}")
-
-        # Дополнительная попытка через GitHub Pages.
-        page_urls = [
-            "https://smolnp.github.io/IPTVru//" + encoded_filename,
-            "https://smolnp.github.io/IPTVru/" + encoded_filename
-        ]
-
-        for page_url in page_urls:
-            try:
-                text = request_text(page_url)
-                print("SMOLNP загружен через GitHub Pages.")
-                return text
-
-            except Exception as exc:
-                last_error = exc
 
     print(f"ОШИБКА загрузки: {last_error}")
     return None
 
 
 def parse(text):
-    """Сохраняет все служебные строки перед адресом потока."""
+    """Сохраняет служебные строки перед адресом потока."""
+
     meta = []
 
     for raw in text.splitlines():
@@ -215,6 +251,7 @@ def parse(text):
 
 def split_extinf(line):
     """Разделяет описание и название канала."""
+
     quoted = False
 
     for i, ch in enumerate(line):
@@ -324,7 +361,6 @@ def main():
 
             lines, group, old = result
 
-            # Сохраняем варианты с разными настройками плеера.
             directives = tuple(
                 line for line in lines[1:]
                 if line.upper().startswith((
