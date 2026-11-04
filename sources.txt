@@ -1,51 +1,11 @@
-SMOLNP — основной российский плейлист
-
-https://smolnp.github.io/IPTVru//IPTVru.m3u
-
-SMOLNP — стабильный плейлист
-
-https://smolnp.github.io/IPTVru//IPTVstable.m3u8
-
-SMOLNP — дополнительные каналы
-
-https://smolnp.github.io/IPTVru//IPTVmir.m3u8
-
-SMOLNP — каналы 18+
-
-https://smolnp.github.io/IPTVru//IPTVххх.m3u
-
-FREE-TV — федеральные каналы РФ
-
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVru.m3u
+https://raw.githubusercontent.com/smolnp/IPTVru/refs/heads/gh-pages/IPTVstable.m3u8
 https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
-
-IPTVRU — российские каналы
-
 https://raw.githubusercontent.com/iptvru/iptv/master/ru(ver48.0).m3u
-
-IPTV-ORG — русский язык
-
 https://iptv-org.github.io/iptv/languages/rus.m3u
-
-IPTV-ORG — Россия
-
 https://iptv-org.github.io/iptv/countries/ru.m3u
-
-IPTV-ORG — фильмы
-
 https://iptv-org.github.io/iptv/categories/movies.m3u
-
-IPTV-ORG — мультфильмы
-
 https://iptv-org.github.io/iptv/categories/animation.m3u
-
-IPTV-ORG — новости
-
 https://iptv-org.github.io/iptv/categories/news.m3u
-
-IPTV-ORG — музыка
-
 https://iptv-org.github.io/iptv/categories/music.m3u
-
-IPTV-ORG — спорт
-
 https://iptv-org.github.io/iptv/categories/sports.m3u
